@@ -62,12 +62,18 @@ function TabButton({ isActive, icon: Icon, label }: { isActive: boolean, icon: L
 export default function AppTabs() {
   const pathname = usePathname();
   const isActive = (path: string) => pathname === path;
+  const isTabBarHidden = pathname.startsWith('/item') || pathname.startsWith('/(auth)');
+
+  const tabBarStyle = StyleSheet.flatten([
+    styles.tabBar,
+    isTabBarHidden ? { display: 'none' } : undefined,
+  ]);
 
   return (
     <Tabs>
       <TabSlot style={styles.content} />
       <TabList asChild>
-        <View style={styles.tabBar}>
+        <View style={tabBarStyle}>
           <TabTrigger name="home" href="/" style={styles.tabTrigger}>
             <TabButton isActive={isActive('/')} icon={House} label="Home" />
           </TabTrigger>
@@ -83,6 +89,9 @@ export default function AppTabs() {
           <TabTrigger name="menu" href="/menu" style={styles.tabTrigger}>
             <TabButton isActive={isActive('/menu')} icon={Menu} label="Menu" />
           </TabTrigger>
+
+          <TabTrigger name="item" href="/item/create" style={styles.hiddenTrigger} />
+          <TabTrigger name="collection" href="/collection/[id]" style={styles.hiddenTrigger} />
         </View>
       </TabList>
     </Tabs>
@@ -90,6 +99,13 @@ export default function AppTabs() {
 }
 
 const styles = StyleSheet.create({
+  hiddenTrigger: {
+    display: 'none',
+    position: 'absolute',
+    width: 0,
+    height: 0,
+    opacity: 0,
+  },
   content: {
     flex: 1,
   },

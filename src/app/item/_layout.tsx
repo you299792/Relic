@@ -1,5 +1,5 @@
-import type { PropsWithChildren } from 'react';
+import { Slot } from 'expo-router';
 
-export default function ItemLayout({ children }: PropsWithChildren) {
-  return children;
+export default function ItemLayout() {
+  return <Slot />;
 }
