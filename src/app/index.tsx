@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   View, 
   Text, 
@@ -10,7 +10,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import {
   Search,
-  Plus,
   Link as LinkIcon,
   FileText,
   LayoutGrid,
@@ -18,99 +17,105 @@ import {
   Image as ImageIcon,
   Folder,
   Tag,
-  Network
+  Network,
+  HardDrive,
+  Video,
 } from 'lucide-react-native';
-
-// --- MOCK STATS DATA ---
-const MOCK_STATS = [
-  { id: '1', label: 'Total Items', count: 124, icon: FileText, color: '#6366F1' },
-  { id: '2', label: 'Collections', count: 8, icon: Folder, color: '#F59E0B' },
-  { id: '3', label: 'Links', count: 45, icon: LinkIcon, color: '#10B981' },
-  { id: '4', label: 'Media', count: 23, icon: ImageIcon, color: '#EC4899' },
-  { id: '5', label: 'Tags', count: 32, icon: Tag, color: '#8B5CF6' },
-  { id: '6', label: 'Relationships', count: 18, icon: Network, color: '#3B82F6' },
-];
-
-// --- RICH MOCK DATA ---
-const MOCK_FEED = [
-  { 
-    id: '1', 
-    title: 'The Art of Noticing', 
-    type: 'article', 
-    source: 'Medium', 
-    image: 'https://images.unsplash.com/photo-1499750310107-5fef28a66643?q=80&w=600&auto=format&fit=crop',
-    imgHeight: 'h-56',
-    note: 'Fascinating read on how paying attention to the small details in life can drastically improve your creativity and overall well-being.',
-    tags: ['mindfulness', 'creativity'],
-    savedAt: '2 hours ago'
-  },
-  { 
-    id: '2', 
-    title: 'React Native Reanimated Docs', 
-    type: 'website', 
-    source: 'reactnative.dev', 
-    image: null, 
-    imgHeight: 'h-0',
-    note: 'Need to dive deep into the shared value API. The new layout animations look incredibly smooth. I should test this with the new collections feature.',
-    tags: ['react-native', 'animation'],
-    savedAt: '5 hours ago'
-  },
-  { 
-    id: '3', 
-    title: 'Minimalist Workspace Setup', 
-    type: 'image', 
-    source: 'Dribbble', 
-    image: 'https://images.unsplash.com/photo-1497215728101-856f4ea42174?q=80&w=600&auto=format&fit=crop',
-    imgHeight: 'h-64',
-    note: 'Love the warm lighting and the wooden desk texture here. Great inspiration for my next desk setup.',
-    tags: ['workspace', 'design'],
-    savedAt: 'Yesterday'
-  },
-  { 
-    id: '4', 
-    title: 'SQLite Performance', 
-    type: 'article', 
-    source: 'dev.to', 
-    image: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?q=80&w=600&auto=format&fit=crop',
-    imgHeight: 'h-40',
-    note: 'Crucial for Relic: Remember to use indexes on foreign keys and use FTS5 for full-text search.',
-    tags: ['database', 'sqlite'],
-    savedAt: 'Yesterday'
-  },
-  { 
-    id: '5', 
-    title: 'Kyoto, Japan', 
-    type: 'image', 
-    source: 'Unsplash', 
-    image: 'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?q=80&w=600&auto=format&fit=crop',
-    imgHeight: 'h-72',
-    note: 'A beautiful quiet street. Adding this to the travel itinerary for next spring. The architecture is incredible.',
-    tags: ['travel', 'japan'],
-    savedAt: '2 days ago'
-  }
-];
+import { useItems } from '../hooks/useItems';
+import { FAB } from '../components/ui/fab';
+import { RelicItem } from '../types/models';
 
 const FILTERS = ['All', 'Articles', 'Images', 'Notes', 'Videos'];
 
 export default function DashboardScreen() {
   const router = useRouter();
+  const { items } = useItems();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [activeFilter, setActiveFilter] = useState('All');
 
-  const leftColumnData = MOCK_FEED.filter((_, index) => index % 2 === 0);
-  const rightColumnData = MOCK_FEED.filter((_, index) => index % 2 !== 0);
+  // Filter items based on activeFilter
+  const filteredItems = useMemo(() => {
+    if (activeFilter === 'All') return items;
+    if (activeFilter === 'Articles') {
+      return items.filter(
+        (i) => i.type === 'article' || (i.category === 'link' && !i.image)
+      );
+    }
+    if (activeFilter === 'Images') {
+      return items.filter(
+        (i) => i.type === 'image' || (i.image && !i.mimeType?.startsWith('video'))
+      );
+    }
+    if (activeFilter === 'Notes') {
+      return items.filter(
+        (i) => i.category === 'note' || i.type === 'note'
+      );
+    }
+    if (activeFilter === 'Videos') {
+      return items.filter(
+        (i) => i.type === 'video' || i.mimeType?.startsWith('video')
+      );
+    }
+    return items;
+  }, [items, activeFilter]);
 
-  // Shared shadow style for soft depth (removes harsh pixels)
+  const leftColumnData = filteredItems.filter((_, index) => index % 2 === 0);
+  const rightColumnData = filteredItems.filter((_, index) => index % 2 !== 0);
+
+  // Dynamic stats calculated from real items
+  const stats = useMemo(() => {
+    const totalCount = items.length;
+    const linksCount = items.filter((i) => i.category === 'link').length;
+    const mediaCount = items.filter(
+      (i) => i.category === 'file' || i.type === 'image' || i.type === 'video' || !!i.image
+    ).length;
+    const notesCount = items.filter((i) => i.category === 'note').length;
+    
+    // Unique tags
+    const allTags = new Set<string>();
+    items.forEach((i) => i.tags?.forEach((t) => allTags.add(t)));
+
+    return [
+      { id: '1', label: 'Total Items', count: totalCount, icon: FileText, color: '#6366F1' },
+      { id: '2', label: 'Collections', count: 8, icon: Folder, color: '#F59E0B' },
+      { id: '3', label: 'Links', count: linksCount, icon: LinkIcon, color: '#10B981' },
+      { id: '4', label: 'Media', count: mediaCount, icon: ImageIcon, color: '#EC4899' },
+      { id: '5', label: 'Notes', count: notesCount, icon: FileText, color: '#8B5CF6' },
+      { id: '6', label: 'Tags', count: allTags.size, icon: Tag, color: '#06B6D4' },
+      { id: '7', label: 'Relationships', count: 18, icon: Network, color: '#3B82F6' },
+    ];
+  }, [items]);
+
+  // Shared shadow style for soft depth
   const softShadow = {
-    shadowColor: '#64748B', // Slate-500 for a softer, more natural shadow
+    shadowColor: '#64748B',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.08,
     shadowRadius: 20,
     elevation: 4,
   };
 
+  const renderItemIcon = (item: RelicItem, size: number = 12) => {
+    if (item.category === 'note' || item.type === 'note') {
+      return <FileText color="#6366F1" size={size} />;
+    }
+    if (item.type === 'video' || item.mimeType?.startsWith('video')) {
+      return <Video color="#6366F1" size={size} />;
+    }
+    if (item.category === 'file') {
+      return <HardDrive color="#6366F1" size={size} />;
+    }
+    if (item.type === 'article') {
+      return <FileText color="#6366F1" size={size} />;
+    }
+    if (item.type === 'image') {
+      return <ImageIcon color="#6366F1" size={size} />;
+    }
+    return <LinkIcon color="#6366F1" size={size} />;
+  };
+
   // --- RENDER GRID CARD ---
-  const renderGridCard = (item: any) => (
+  const renderGridCard = (item: RelicItem) => (
     <TouchableOpacity 
       key={item.id} 
       onPress={() => router.push(`/item/${item.id}`)}
@@ -119,26 +124,30 @@ export default function DashboardScreen() {
       style={softShadow}
     >
       {item.image && (
-        <Image source={{ uri: item.image }} className={`w-full ${item.imgHeight}`} resizeMode="cover" />
+        <Image 
+          source={{ uri: item.image }} 
+          className={`w-full ${item.imgHeight || 'h-48'}`} 
+          resizeMode="cover" 
+        />
       )}
       <View className="p-4">
         <View className="flex-row items-center gap-1.5 mb-2.5">
           <View className="bg-indigo-50 p-1.5 rounded-lg">
-            {item.type === 'article' && <FileText color="#6366F1" size={12} />}
-            {item.type === 'website' && <LinkIcon color="#6366F1" size={12} />}
-            {item.type === 'image' && <ImageIcon color="#6366F1" size={12} />}
+            {renderItemIcon(item, 12)}
           </View>
-          <Text className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">
-            {item.source}
+          <Text className="text-slate-500 text-[10px] font-bold uppercase tracking-widest" numberOfLines={1}>
+            {item.source || item.category}
           </Text>
         </View>
         <Text className="text-slate-800 text-base font-bold mb-2 leading-snug" numberOfLines={2}>
           {item.title}
         </Text>
-        <Text className="text-slate-500 text-xs leading-relaxed mb-3" numberOfLines={3}>
-          "{item.note}"
-        </Text>
-        {item.tags.length > 0 && (
+        {item.note ? (
+          <Text className="text-slate-500 text-xs leading-relaxed mb-3" numberOfLines={3}>
+            {`"${item.note}"`}
+          </Text>
+        ) : null}
+        {item.tags && item.tags.length > 0 && (
           <View className="bg-slate-100 self-start px-2 py-1 rounded-md">
             <Text className="text-slate-600 text-[10px] font-semibold tracking-wide">#{item.tags[0]}</Text>
           </View>
@@ -148,7 +157,7 @@ export default function DashboardScreen() {
   );
 
   // --- RENDER LIST CARD ---
-  const renderListCard = (item: any) => (
+  const renderListCard = (item: RelicItem) => (
     <TouchableOpacity 
       key={item.id} 
       onPress={() => router.push(`/item/${item.id}`)}
@@ -163,12 +172,10 @@ export default function DashboardScreen() {
         <View className="flex-row justify-between items-center mb-3">
           <View className="flex-row items-center gap-2">
             <View className="bg-indigo-50 p-2 rounded-lg">
-              {item.type === 'article' && <FileText color="#6366F1" size={14} />}
-              {item.type === 'website' && <LinkIcon color="#6366F1" size={14} />}
-              {item.type === 'image' && <ImageIcon color="#6366F1" size={14} />}
+              {renderItemIcon(item, 14)}
             </View>
             <Text className="text-slate-500 text-xs font-bold uppercase tracking-widest">
-              {item.source}
+              {item.source || item.category}
             </Text>
           </View>
           <Text className="text-slate-400 text-xs font-medium">{item.savedAt}</Text>
@@ -176,16 +183,20 @@ export default function DashboardScreen() {
         <Text className="text-slate-800 text-xl font-bold mb-2.5 leading-tight">
           {item.title}
         </Text>
-        <View className="bg-slate-50 p-4 rounded-2xl mb-4">
-          <Text className="text-slate-600 text-sm leading-relaxed">"{item.note}"</Text>
-        </View>
-        <View className="flex-row flex-wrap gap-2">
-          {item.tags.map((tag: string, i: number) => (
-            <View key={i} className="bg-indigo-50/80 px-2.5 py-1 rounded-md">
-              <Text className="text-indigo-600 text-xs font-semibold">#{tag}</Text>
-            </View>
-          ))}
-        </View>
+        {item.note ? (
+          <View className="bg-slate-50 p-4 rounded-2xl mb-4">
+            <Text className="text-slate-600 text-sm leading-relaxed">{`"${item.note}"`}</Text>
+          </View>
+        ) : null}
+        {item.tags && item.tags.length > 0 && (
+          <View className="flex-row flex-wrap gap-2">
+            {item.tags.map((tag: string, i: number) => (
+              <View key={i} className="bg-indigo-50/80 px-2.5 py-1 rounded-md">
+                <Text className="text-indigo-600 text-xs font-semibold">#{tag}</Text>
+              </View>
+            ))}
+          </View>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -196,7 +207,7 @@ export default function DashboardScreen() {
       <ScrollView 
         className="flex-1" 
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 100 }}
+        contentContainerStyle={{ paddingBottom: 120 }}
       >
         {/* --- HEADER --- */}
         <View className="flex-row items-center justify-between px-5 pt-4 pb-5">
@@ -229,7 +240,7 @@ export default function DashboardScreen() {
             showsHorizontalScrollIndicator={false} 
             contentContainerStyle={{ paddingHorizontal: 20, gap: 12 }}
           >
-            {MOCK_STATS.map((stat) => {
+            {stats.map((stat) => {
               const Icon = stat.icon;
               return (
                 <View 
@@ -288,34 +299,34 @@ export default function DashboardScreen() {
 
         {/* --- FEED CONTAINER --- */}
         <View className="px-4">
-          {viewMode === 'grid' ? (
+          {filteredItems.length === 0 ? (
+            <View className="bg-white rounded-3xl p-8 items-center justify-center my-6" style={softShadow}>
+              <View className="w-14 h-14 rounded-full bg-indigo-50 items-center justify-center mb-3">
+                <FileText color="#6366F1" size={24} />
+              </View>
+              <Text className="text-slate-800 text-base font-bold mb-1">No items found</Text>
+              <Text className="text-slate-500 text-xs text-center">
+                There are no {activeFilter.toLowerCase()} saved in your archive yet. Tap the + button to add one!
+              </Text>
+            </View>
+          ) : viewMode === 'grid' ? (
             <View className="flex-row justify-between">
               <View className="w-[48.5%]">{leftColumnData.map(renderGridCard)}</View>
               <View className="w-[48.5%]">{rightColumnData.map(renderGridCard)}</View>
             </View>
           ) : (
-            <View>{MOCK_FEED.map(renderListCard)}</View>
+            <View>{filteredItems.map(renderListCard)}</View>
           )}
         </View>
 
       </ScrollView>
 
       {/* --- FLOATING ACTION BUTTON (FAB) --- */}
-      <TouchableOpacity
+      <FAB
         onPress={() => router.push('/item/create')}
-        activeOpacity={0.8}
-        className="absolute bottom-8 right-6 bg-indigo-600 w-14 h-14 rounded-full items-center justify-center"
-        style={{
-          shadowColor: '#6366F1',
-          shadowOffset: { width: 0, height: 6 },
-          shadowOpacity: 0.4,
-          shadowRadius: 10,
-          elevation: 8,
-        }}
-      >
-        <Plus color="white" size={28} />
-      </TouchableOpacity>
+        accessibilityLabel="Create archive item"
+      />
 
     </SafeAreaView>
   );
-} 
+}
