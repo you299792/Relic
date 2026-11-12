@@ -95,7 +95,7 @@ export default function MenuScreen() {
         >
           <View className="bg-indigo-100 p-1 rounded-full mr-4">
             <Image 
-              source={{ uri: 'https://i.pravatar.cc/150?u=a042581f4e29026704d' }} 
+              source={{ uri: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSAf7UZxkAKqgJRL0lP9Kl1lwapeWY-bvqoWrITW3TeYvk8q6Eh9EQUTa8&s=10' }} 
               className="w-16 h-16 rounded-full"
             />
           </View>
@@ -129,7 +129,7 @@ export default function MenuScreen() {
           <MenuItem 
             icon={Database} 
             title="Database Size" 
-            subtitle="24.5 MB used"
+            subtitle="24.5 MB used / 50TB free space"
             color="#6366F1" // Indigo
           />
           <MenuItem 
