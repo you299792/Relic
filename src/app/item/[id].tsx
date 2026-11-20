@@ -1,12 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   ScrollView,
   Image,
   TouchableOpacity,
-  StyleSheet,
   Linking,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -18,40 +18,73 @@ import {
   HardDrive,
   FileText,
   Link as LinkIcon,
+  ImageIcon,
+  Video,
   Trash2,
+  X,
 } from 'lucide-react-native';
 import { useItems } from '../../hooks/useItems';
+import { RelicItem } from '../../types/models';
+
+const softShadow = {
+  shadowColor: '#64748B',
+  shadowOffset: { width: 0, height: 6 },
+  shadowOpacity: 0.08,
+  shadowRadius: 16,
+  elevation: 3,
+};
+
+function getTypeMeta(item: RelicItem) {
+  if (item.category === 'note' || item.type === 'note') {
+    return { Icon: FileText, label: 'Note' };
+  }
+  if (item.type === 'video' || item.mimeType?.startsWith('video')) {
+    return { Icon: Video, label: 'Video' };
+  }
+  if (item.category === 'file') {
+    return { Icon: HardDrive, label: 'File' };
+  }
+  if (item.type === 'image') {
+    return { Icon: ImageIcon, label: 'Image' };
+  }
+  return { Icon: LinkIcon, label: 'Link' };
+}
 
 export default function ItemDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { items, deleteItem } = useItems();
+  const [isImageViewerVisible, setImageViewerVisible] = useState(false);
 
   const item = items.find((i) => i.id === id);
 
-  const softShadow = {
-    shadowColor: '#64748B',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 3,
-  };
-
   if (!item) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={[styles.backBtn, softShadow]}>
+      <SafeAreaView className="flex-1 bg-[#F4F6F9]" edges={['top']}>
+        <View className="flex-row items-center px-5 pt-3 pb-4">
+          <TouchableOpacity
+            onPress={() => router.replace('/')}
+            activeOpacity={0.7}
+            className="bg-white w-11 h-11 rounded-full items-center justify-center"
+            style={softShadow}
+          >
             <ArrowLeft size={20} color="#1E293B" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Item Not Found</Text>
         </View>
-        <View style={styles.notFoundWrap}>
-          <Text style={styles.notFoundText}>This item could not be found or was removed.</Text>
+        <View className="flex-1 items-center justify-center px-10 -mt-20">
+          <View className="bg-white p-6 rounded-full mb-6" style={softShadow}>
+            <FileText color="#CBD5E1" size={40} />
+          </View>
+          <Text className="text-slate-800 text-lg font-bold mb-2">Item not found</Text>
+          <Text className="text-slate-500 text-sm text-center">
+            This item could not be found or may have been removed.
+          </Text>
         </View>
       </SafeAreaView>
     );
   }
+
+  const { Icon: TypeIcon, label: typeLabel } = getTypeMeta(item);
 
   const handleDelete = async () => {
     await deleteItem(item.id);
@@ -65,269 +98,175 @@ export default function ItemDetailScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7} style={[styles.backBtn, softShadow]}>
+    <SafeAreaView className="flex-1 bg-[#F4F6F9]" edges={['top']}>
+      {/* --- HEADER --- */}
+      <View className="flex-row items-center justify-between px-5 pt-3 pb-4">
+        <TouchableOpacity
+          onPress={() => router.replace('/')}
+          activeOpacity={0.7}
+          className="bg-white w-11 h-11 rounded-full items-center justify-center"
+          style={softShadow}
+        >
           <ArrowLeft size={20} color="#1E293B" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>
-          {item.category.toUpperCase()}
+
+        <Text className="text-slate-500 text-xs font-extrabold uppercase tracking-widest">
+          {typeLabel}
         </Text>
-        <TouchableOpacity onPress={handleDelete} activeOpacity={0.7} style={[styles.backBtn, styles.deleteBtn]}>
+
+        <TouchableOpacity
+          onPress={handleDelete}
+          activeOpacity={0.7}
+          className="bg-red-50 w-11 h-11 rounded-full items-center justify-center"
+        >
           <Trash2 size={18} color="#EF4444" />
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Cover Image / Thumbnail */}
-        {item.image && (
-          <View style={[styles.imageWrap, softShadow]}>
-            <Image source={{ uri: item.image }} style={styles.image} resizeMode="cover" />
+      <ScrollView
+        className="flex-1"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 60 }}
+      >
+        {/* --- COVER IMAGE OR TYPE BANNER --- */}
+        {item.image ? (
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={() => setImageViewerVisible(true)}
+            className="w-full h-56 rounded-[24px] overflow-hidden bg-slate-200 mb-5"
+            style={softShadow}
+          >
+            <Image source={{ uri: item.image }} className="w-full h-full" resizeMode="cover" />
+          </TouchableOpacity>
+        ) : (
+          <View
+            className="w-full h-28 rounded-[24px] bg-indigo-50 items-center justify-center mb-5"
+          >
+            <TypeIcon color="#6366F1" size={32} />
           </View>
         )}
 
-        {/* Source & Date Badge */}
-        <View style={styles.metaRow}>
-          <View style={styles.sourceBadge}>
-            {item.category === 'link' && <LinkIcon size={12} color="#6366F1" />}
-            {item.category === 'note' && <FileText size={12} color="#6366F1" />}
-            {item.category === 'file' && <HardDrive size={12} color="#6366F1" />}
-            <Text style={styles.sourceText}>{item.source || item.category}</Text>
+        {/* --- SOURCE & DATE --- */}
+        <View className="flex-row items-center justify-between mb-3">
+          <View className="flex-row items-center gap-1.5 bg-indigo-50 self-start px-2.5 py-1.5 rounded-lg">
+            <TypeIcon size={12} color="#6366F1" />
+            <Text className="text-indigo-700 text-[11px] font-bold uppercase tracking-wide" numberOfLines={1}>
+              {item.source || item.category}
+            </Text>
           </View>
 
-          <View style={styles.dateRow}>
+          <View className="flex-row items-center gap-1">
             <Calendar size={12} color="#94A3B8" />
-            <Text style={styles.dateText}>{item.savedAt || 'Saved'}</Text>
+            <Text className="text-slate-400 text-xs font-medium">{item.savedAt || 'Saved'}</Text>
           </View>
         </View>
 
-        {/* Title */}
-        <Text style={styles.title}>{item.title}</Text>
+        {/* --- TITLE --- */}
+        <Text className="text-slate-900 text-2xl font-extrabold leading-tight mb-4">
+          {item.title}
+        </Text>
 
-        {/* URL Action Button */}
+        {/* --- URL ACTION --- */}
         {item.url && (
-          <TouchableOpacity onPress={handleOpenUrl} style={styles.urlButton} activeOpacity={0.8}>
+          <TouchableOpacity
+            onPress={handleOpenUrl}
+            activeOpacity={0.8}
+            className="flex-row items-center gap-2 bg-indigo-50 p-3.5 rounded-2xl mb-4"
+          >
             <ExternalLink size={16} color="#4F46E5" />
-            <Text style={styles.urlText} numberOfLines={1}>
+            <Text className="text-indigo-700 text-[13px] font-semibold flex-1" numberOfLines={1}>
               {item.url}
             </Text>
           </TouchableOpacity>
         )}
 
-        {/* File Metadata Info */}
+        {/* --- FILE METADATA --- */}
         {item.category === 'file' && (
-          <View style={styles.fileBox}>
-            <HardDrive size={20} color="#6366F1" />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.fileName}>{item.fileName || 'Attached File'}</Text>
-              {item.mimeType && <Text style={styles.fileMime}>{item.mimeType}</Text>}
+          <View
+            className="flex-row items-center gap-3 bg-white p-4 rounded-[18px] mb-4"
+            style={softShadow}
+          >
+            <View className="bg-indigo-50 p-2.5 rounded-xl">
+              <HardDrive size={20} color="#6366F1" />
+            </View>
+            <View className="flex-1">
+              <Text className="text-slate-800 text-sm font-bold" numberOfLines={1}>
+                {item.fileName || 'Attached file'}
+              </Text>
+              {item.mimeType && (
+                <Text className="text-slate-400 text-xs mt-0.5">{item.mimeType}</Text>
+              )}
             </View>
           </View>
         )}
 
-        {/* Note / Content */}
+        {/* --- NOTE / CONTENT --- */}
         {item.note && (
-          <View style={styles.noteBox}>
-            <Text style={styles.noteBoxLabel}>NOTES</Text>
-            <Text style={styles.noteContent}>{item.note}</Text>
+          <View
+            className="bg-white p-5 rounded-[20px] mb-4 border border-slate-100"
+            style={softShadow}
+          >
+            <Text className="text-slate-400 text-[10px] font-extrabold tracking-widest mb-2.5">
+              NOTES
+            </Text>
+            <Text className="text-slate-700 text-[15px] leading-relaxed">{item.note}</Text>
           </View>
         )}
 
-        {/* Tags */}
+        {/* --- TAGS --- */}
         {item.tags && item.tags.length > 0 && (
-          <View style={styles.tagsContainer}>
-            <Text style={styles.tagsLabel}>TAGS</Text>
-            <View style={styles.tagsRow}>
+          <View className="mt-1">
+            <Text className="text-slate-500 text-[11px] font-extrabold tracking-widest mb-2.5">
+              TAGS
+            </Text>
+            <View className="flex-row flex-wrap gap-2">
               {item.tags.map((tag, idx) => (
-                <View key={idx} style={styles.tagBadge}>
+                <View
+                  key={idx}
+                  className="flex-row items-center gap-1 bg-indigo-50 px-3 py-1.5 rounded-lg"
+                >
                   <TagIcon size={12} color="#6366F1" />
-                  <Text style={styles.tagText}>#{tag}</Text>
+                  <Text className="text-indigo-700 text-xs font-semibold">#{tag}</Text>
                 </View>
               ))}
             </View>
           </View>
         )}
       </ScrollView>
+
+      {/* --- FULLSCREEN IMAGE VIEWER --- */}
+      {item.image && (
+        <Modal
+          visible={isImageViewerVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setImageViewerVisible(false)}
+        >
+          <View className="flex-1 bg-black">
+            <TouchableOpacity
+              activeOpacity={1}
+              onPress={() => setImageViewerVisible(false)}
+              className="flex-1 items-center justify-center"
+            >
+              <Image
+                source={{ uri: item.image }}
+                className="w-full h-full"
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
+
+            <SafeAreaView edges={['top']} style={{ position: 'absolute', top: 0, right: 0 }}>
+              <TouchableOpacity
+                onPress={() => setImageViewerVisible(false)}
+                activeOpacity={0.7}
+                className="bg-white/15 w-11 h-11 rounded-full items-center justify-center mr-5 mt-3"
+              >
+                <X size={20} color="#FFFFFF" />
+              </TouchableOpacity>
+            </SafeAreaView>
+          </View>
+        </Modal>
+      )}
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F4F6F9',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 16,
-  },
-  backBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  deleteBtn: {
-    backgroundColor: '#FEE2E2',
-  },
-  headerTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#64748B',
-    letterSpacing: 1.5,
-  },
-  content: {
-    paddingHorizontal: 20,
-    paddingBottom: 60,
-  },
-  imageWrap: {
-    width: '100%',
-    height: 220,
-    borderRadius: 24,
-    overflow: 'hidden',
-    backgroundColor: '#E2E8F0',
-    marginBottom: 20,
-  },
-  image: {
-    width: '100%',
-    height: '100%',
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  sourceBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#EEF2FF',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-  },
-  sourceText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#4F46E5',
-    textTransform: 'uppercase',
-  },
-  dateRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  dateText: {
-    fontSize: 12,
-    color: '#94A3B8',
-    fontWeight: '500',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#0F172A',
-    lineHeight: 32,
-    marginBottom: 16,
-  },
-  urlButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#EEF2FF',
-    padding: 14,
-    borderRadius: 16,
-    marginBottom: 20,
-  },
-  urlText: {
-    fontSize: 13,
-    color: '#4F46E5',
-    fontWeight: '600',
-    flex: 1,
-  },
-  fileBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderRadius: 18,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  fileName: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#1E293B',
-  },
-  fileMime: {
-    fontSize: 11,
-    color: '#94A3B8',
-    marginTop: 2,
-  },
-  noteBox: {
-    backgroundColor: '#FFFFFF',
-    padding: 18,
-    borderRadius: 20,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  noteBoxLabel: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#94A3B8',
-    letterSpacing: 1.2,
-    marginBottom: 8,
-  },
-  noteContent: {
-    fontSize: 15,
-    color: '#334155',
-    lineHeight: 24,
-  },
-  tagsContainer: {
-    marginTop: 8,
-  },
-  tagsLabel: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#64748B',
-    letterSpacing: 1.2,
-    marginBottom: 10,
-  },
-  tagsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  tagBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#EEF2FF',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 10,
-  },
-  tagText: {
-    fontSize: 12,
-    color: '#4F46E5',
-    fontWeight: '600',
-  },
-  notFoundWrap: {
-    padding: 24,
-    alignItems: 'center',
-  },
-  notFoundText: {
-    fontSize: 14,
-    color: '#64748B',
-  },
-});
