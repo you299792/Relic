@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { DiscoverFeed } from '../components/discover/discover-feed';
 import {
   Search as SearchIcon,
   X,
@@ -162,14 +163,14 @@ export default function SearchScreen() {
             </View>
 
             {/* Suggested Tags */}
-            <View>
+            <View className="mb-10">
               <View className="flex-row items-center gap-2 mb-5">
                 <TrendingUp color="#64748B" size={20} />
                 <Text className="text-slate-800 text-lg font-bold">Suggested Tags</Text>
               </View>
               <View className="flex-row flex-wrap gap-2.5">
                 {SUGGESTED_TAGS.map((tag, index) => (
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     key={index}
                     onPress={() => setQuery(tag.replace('#', ''))}
                     className="bg-indigo-50/80 px-4 py-2.5 rounded-xl"
@@ -179,6 +180,9 @@ export default function SearchScreen() {
                 ))}
               </View>
             </View>
+
+            {/* Articles from the internet, based on saved items */}
+            <DiscoverFeed />
           </View>
         ) : (
           // ==========================================
@@ -228,6 +232,10 @@ export default function SearchScreen() {
                 </View>
               </TouchableOpacity>
             ))}
+
+            <View className="mt-6">
+              <DiscoverFeed query={query} />
+            </View>
           </View>
         )}
       </ScrollView>
