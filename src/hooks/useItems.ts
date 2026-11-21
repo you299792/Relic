@@ -249,10 +249,29 @@ export function useItems() {
     [items]
   );
 
+  const updateItem = useCallback(
+    async (
+      id: string,
+      changes: Partial<Pick<RelicItem, 'title' | 'url' | 'note' | 'tags' | 'source'>>
+    ) => {
+      const currentList = inMemoryItems || items;
+      const updated = currentList.map((item) => (item.id === id ? { ...item, ...changes } : item));
+      inMemoryItems = updated;
+      notifyListeners(updated);
+      try {
+        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      } catch (err) {
+        console.error('Failed to update item:', err);
+      }
+    },
+    [items]
+  );
+
   return {
     items,
     loading,
     addItem,
+    updateItem,
     deleteItem,
     checkDuplicate,
   };

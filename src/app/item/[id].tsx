@@ -7,6 +7,10 @@ import {
   TouchableOpacity,
   Linking,
   Modal,
+  TextInput,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -20,11 +24,13 @@ import {
   Link as LinkIcon,
   ImageIcon,
   Video,
-  Trash2,
+  Check,
   X,
 } from 'lucide-react-native';
 import { useItems } from '../../hooks/useItems';
 import { RelicItem } from '../../types/models';
+import { ItemMenu } from '../../components/items/item-menu';
+import { ItemVideoPlayer } from '../../components/items/video-player';
 
 const softShadow = {
   shadowColor: '#64748B',
@@ -51,12 +57,17 @@ function getTypeMeta(item: RelicItem) {
 }
 
 export default function ItemDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, edit } = useLocalSearchParams<{ id: string; edit?: string }>();
   const router = useRouter();
-  const { items, deleteItem } = useItems();
+  const { items, deleteItem, updateItem } = useItems();
   const [isImageViewerVisible, setImageViewerVisible] = useState(false);
-
   const item = items.find((i) => i.id === id);
+  const startInEdit = edit === '1' && !!item;
+  const [isEditing, setIsEditing] = useState(startInEdit);
+  const [titleDraft, setTitleDraft] = useState(startInEdit ? item!.title : '');
+  const [urlDraft, setUrlDraft] = useState(startInEdit ? item!.url ?? '' : '');
+  const [noteDraft, setNoteDraft] = useState(startInEdit ? item!.note ?? '' : '');
+  const [tagsDraft, setTagsDraft] = useState(startInEdit ? (item!.tags ?? []).join(', ') : '');
 
   if (!item) {
     return (
@@ -91,6 +102,37 @@ export default function ItemDetailScreen() {
     router.replace('/');
   };
 
+  const startEditing = () => {
+    setTitleDraft(item.title);
+    setUrlDraft(item.url ?? '');
+    setNoteDraft(item.note ?? '');
+    setTagsDraft((item.tags ?? []).join(', '));
+    setIsEditing(true);
+  };
+
+  const handleSave = async () => {
+    if (!titleDraft.trim()) {
+      Alert.alert('Missing Title', 'Title cannot be empty.');
+      return;
+    }
+    if (item.category === 'link' && !urlDraft.trim()) {
+      Alert.alert('Missing URL', 'Please enter a URL for this link.');
+      return;
+    }
+    const tags = tagsDraft
+      .split(',')
+      .map((t) => t.trim().toLowerCase().replace(/^#/, ''))
+      .filter((t) => t.length > 0);
+
+    await updateItem(item.id, {
+      title: titleDraft.trim(),
+      url: item.category === 'link' ? urlDraft.trim() : item.url,
+      note: noteDraft.trim() || undefined,
+      tags,
+    });
+    setIsEditing(false);
+  };
+
   const handleOpenUrl = () => {
     if (item.url) {
       Linking.openURL(item.url).catch((err) => console.error('Failed to open URL:', err));
@@ -114,22 +156,50 @@ export default function ItemDetailScreen() {
           {typeLabel}
         </Text>
 
-        <TouchableOpacity
-          onPress={handleDelete}
-          activeOpacity={0.7}
-          className="bg-red-50 w-11 h-11 rounded-full items-center justify-center"
-        >
-          <Trash2 size={18} color="#EF4444" />
-        </TouchableOpacity>
+        {isEditing ? (
+          <View className="flex-row items-center gap-2">
+            <TouchableOpacity
+              onPress={() => setIsEditing(false)}
+              activeOpacity={0.7}
+              className="bg-white w-11 h-11 rounded-full items-center justify-center"
+              style={softShadow}
+            >
+              <X size={18} color="#64748B" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleSave}
+              activeOpacity={0.7}
+              className="bg-indigo-600 w-11 h-11 rounded-full items-center justify-center"
+            >
+              <Check size={18} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <ItemMenu
+            title={item.title}
+            onEdit={startEditing}
+            onDelete={handleDelete}
+            className="bg-white w-11 h-11 rounded-full items-center justify-center"
+            style={softShadow}
+            iconColor="#1E293B"
+          />
+        )}
       </View>
 
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
       <ScrollView
         className="flex-1"
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 60 }}
       >
         {/* --- COVER IMAGE OR TYPE BANNER --- */}
-        {item.image ? (
+        {item.fileUri && (item.type === 'video' || item.mimeType?.startsWith('video')) ? (
+          <ItemVideoPlayer key={item.fileUri} uri={item.fileUri} thumbnail={item.image} />
+        ) : item.image ? (
           <TouchableOpacity
             activeOpacity={0.9}
             onPress={() => setImageViewerVisible(true)}
@@ -161,13 +231,64 @@ export default function ItemDetailScreen() {
           </View>
         </View>
 
+        {isEditing && (
+          <>
+            <Text className="text-slate-500 text-[11px] font-extrabold tracking-widest mb-2">TITLE</Text>
+            <TextInput
+              value={titleDraft}
+              onChangeText={setTitleDraft}
+              placeholder="Title"
+              placeholderTextColor="#94A3B8"
+              className="bg-white border border-slate-200 rounded-2xl px-4 py-3.5 text-[15px] text-slate-800 font-medium mb-4"
+            />
+            {item.category === 'link' && (
+              <>
+                <Text className="text-slate-500 text-[11px] font-extrabold tracking-widest mb-2">URL</Text>
+                <TextInput
+                  value={urlDraft}
+                  onChangeText={setUrlDraft}
+                  placeholder="https://example.com"
+                  placeholderTextColor="#94A3B8"
+                  keyboardType="url"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  className="bg-white border border-slate-200 rounded-2xl px-4 py-3.5 text-[15px] text-slate-800 font-medium mb-4"
+                />
+              </>
+            )}
+            <Text className="text-slate-500 text-[11px] font-extrabold tracking-widest mb-2">NOTES</Text>
+            <TextInput
+              value={noteDraft}
+              onChangeText={setNoteDraft}
+              placeholder="Add notes..."
+              placeholderTextColor="#94A3B8"
+              multiline
+              textAlignVertical="top"
+              className="bg-white border border-slate-200 rounded-2xl px-4 py-3.5 text-[15px] text-slate-800 font-medium mb-4 min-h-[120px]"
+            />
+            <Text className="text-slate-500 text-[11px] font-extrabold tracking-widest mb-2">
+              TAGS (COMMA SEPARATED)
+            </Text>
+            <TextInput
+              value={tagsDraft}
+              onChangeText={setTagsDraft}
+              placeholder="e.g. design, reading"
+              placeholderTextColor="#94A3B8"
+              autoCapitalize="none"
+              className="bg-white border border-slate-200 rounded-2xl px-4 py-3.5 text-[15px] text-slate-800 font-medium mb-4"
+            />
+          </>
+        )}
+
         {/* --- TITLE --- */}
+        {!isEditing && (
         <Text className="text-slate-900 text-2xl font-extrabold leading-tight mb-4">
           {item.title}
         </Text>
+        )}
 
         {/* --- URL ACTION --- */}
-        {item.url && (
+        {!isEditing && item.url && (
           <TouchableOpacity
             onPress={handleOpenUrl}
             activeOpacity={0.8}
@@ -201,7 +322,7 @@ export default function ItemDetailScreen() {
         )}
 
         {/* --- NOTE / CONTENT --- */}
-        {item.note && (
+        {!isEditing && item.note && (
           <View
             className="bg-white p-5 rounded-[20px] mb-4 border border-slate-100"
             style={softShadow}
@@ -214,7 +335,7 @@ export default function ItemDetailScreen() {
         )}
 
         {/* --- TAGS --- */}
-        {item.tags && item.tags.length > 0 && (
+        {!isEditing && item.tags && item.tags.length > 0 && (
           <View className="mt-1">
             <Text className="text-slate-500 text-[11px] font-extrabold tracking-widest mb-2.5">
               TAGS
@@ -233,6 +354,7 @@ export default function ItemDetailScreen() {
           </View>
         )}
       </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* --- FULLSCREEN IMAGE VIEWER --- */}
       {item.image && (
