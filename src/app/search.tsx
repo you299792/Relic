@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { withFrom } from '../utils/nav';
 import { DiscoverFeed } from '../components/discover/discover-feed';
 import {
   Search as SearchIcon,
@@ -196,7 +197,7 @@ export default function SearchScreen() {
             {MOCK_RESULTS.map((item) => (
               <TouchableOpacity 
                 key={item.id}
-                onPress={() => router.push(`/item/${item.id}`)}
+                onPress={() => router.push(withFrom(`/item/${item.id}`, '/search'))}
                 activeOpacity={0.9}
                 className="bg-white rounded-3xl p-5 mb-4 flex-row items-start"
                 style={softShadow}

@@ -11,7 +11,8 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
+import { withFrom } from '../../utils/nav';
 import { Check, Tag as TagIcon, Globe } from 'lucide-react-native';
 import { CategoryPicker } from './category-picker';
 import { ThumbnailPicker } from './thumbnail-picker';
@@ -23,13 +24,17 @@ import { ItemCategory, RelicItem, DuplicateCheckResult } from '../../types/model
 interface CreateItemFormProps {
   onSuccess?: (item: RelicItem) => void;
   onCancel?: () => void;
+  collectionId?: string | null;
+  initialCategory?: ItemCategory;
+  /** Screen to return to after leaving a detail view opened from this form */
+  returnTo?: string;
 }
 
-export function CreateItemForm({ onSuccess, onCancel }: CreateItemFormProps) {
+export function CreateItemForm({ onSuccess, onCancel, collectionId, initialCategory, returnTo }: CreateItemFormProps) {
   const router = useRouter();
   const { addItem, checkDuplicate } = useItems();
 
-  const [category, setCategory] = useState<ItemCategory>('link');
+  const [category, setCategory] = useState<ItemCategory>(initialCategory ?? 'link');
   const [title, setTitle] = useState('');
   const [url, setUrl] = useState('');
   const [noteContent, setNoteContent] = useState('');
@@ -106,6 +111,7 @@ export function CreateItemForm({ onSuccess, onCancel }: CreateItemFormProps) {
         fileSize: category === 'file' ? selectedFile?.size : undefined,
         mimeType: category === 'file' ? selectedFile?.mimeType : undefined,
         tags: parsedTags,
+        collectionId: collectionId ?? null,
       };
 
       const result = await addItem(candidateData, { allowDuplicate });
@@ -125,7 +131,7 @@ export function CreateItemForm({ onSuccess, onCancel }: CreateItemFormProps) {
       if (onSuccess && result.item) {
         onSuccess(result.item);
       } else {
-        router.back();
+        router.replace((returnTo ?? '/') as Href);
       }
     } catch (err) {
       console.error('Failed to create item:', err);
@@ -389,7 +395,7 @@ export function CreateItemForm({ onSuccess, onCancel }: CreateItemFormProps) {
         }}
         onViewExisting={(item) => {
           setDuplicateModalVisible(false);
-          router.push(`/item/${item.id}`);
+          router.push(withFrom(`/item/${item.id}`, returnTo ?? '/'));
         }}
       />
     </KeyboardAvoidingView>
