@@ -25,3 +25,12 @@ export interface DuplicateCheckResult {
   matchedItem?: RelicItem;
   reason?: string;
 }
+
+export interface Collection {
+  id: string;
+  name: string;
+  color: string;
+  /** null/undefined = top-level folder */
+  parentId?: string | null;
+  createdAt: string;
+}
