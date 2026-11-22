@@ -160,6 +160,7 @@ export function useItems() {
         fileSize?: number | null;
         mimeType?: string | null;
         tags?: string[];
+        collectionId?: string | null;
       },
       options: { allowDuplicate?: boolean } = {}
     ): Promise<{
@@ -212,6 +213,7 @@ export function useItems() {
         fileSize: data.fileSize || null,
         mimeType: data.mimeType || null,
         tags: data.tags && data.tags.length > 0 ? data.tags : [data.category],
+        collectionId: data.collectionId ?? null,
         createdAt: new Date().toISOString(),
         savedAt: 'Just now',
       };
@@ -267,9 +269,28 @@ export function useItems() {
     [items]
   );
 
+  // Items in a deleted folder go back to being un-filed (still visible on Home)
+  const clearCollections = useCallback(
+    async (collectionIds: string[]) => {
+      const currentList = inMemoryItems || items;
+      const updated = currentList.map((item) =>
+        item.collectionId && collectionIds.includes(item.collectionId) ? { ...item, collectionId: null } : item
+      );
+      inMemoryItems = updated;
+      notifyListeners(updated);
+      try {
+        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      } catch (err) {
+        console.error('Failed to clear collection:', err);
+      }
+    },
+    [items]
+  );
+
   return {
     items,
     loading,
+    clearCollections,
     addItem,
     updateItem,
     deleteItem,
