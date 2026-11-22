@@ -13,7 +13,7 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import {
   ArrowLeft,
   ExternalLink,
@@ -57,11 +57,13 @@ function getTypeMeta(item: RelicItem) {
 }
 
 export default function ItemDetailScreen() {
-  const { id, edit } = useLocalSearchParams<{ id: string; edit?: string }>();
+  const { id, edit, from } = useLocalSearchParams<{ id: string; edit?: string; from?: string }>();
   const router = useRouter();
   const { items, deleteItem, updateItem } = useItems();
   const [isImageViewerVisible, setImageViewerVisible] = useState(false);
   const item = items.find((i) => i.id === id);
+  // Back always returns to the screen the user came from (falls back to the item's folder, then Home)
+  const backHref = (from ?? (item?.collectionId ? `/collection/${item.collectionId}` : '/')) as Href;
   const startInEdit = edit === '1' && !!item;
   const [isEditing, setIsEditing] = useState(startInEdit);
   const [titleDraft, setTitleDraft] = useState(startInEdit ? item!.title : '');
@@ -74,7 +76,7 @@ export default function ItemDetailScreen() {
       <SafeAreaView className="flex-1 bg-[#F4F6F9]" edges={['top']}>
         <View className="flex-row items-center px-5 pt-3 pb-4">
           <TouchableOpacity
-            onPress={() => router.replace('/')}
+            onPress={() => router.replace(backHref)}
             activeOpacity={0.7}
             className="bg-white w-11 h-11 rounded-full items-center justify-center"
             style={softShadow}
@@ -99,7 +101,7 @@ export default function ItemDetailScreen() {
 
   const handleDelete = async () => {
     await deleteItem(item.id);
-    router.replace('/');
+    router.replace(backHref);
   };
 
   const startEditing = () => {
@@ -144,7 +146,7 @@ export default function ItemDetailScreen() {
       {/* --- HEADER --- */}
       <View className="flex-row items-center justify-between px-5 pt-3 pb-4">
         <TouchableOpacity
-          onPress={() => router.replace('/')}
+          onPress={() => router.replace(backHref)}
           activeOpacity={0.7}
           className="bg-white w-11 h-11 rounded-full items-center justify-center"
           style={softShadow}
