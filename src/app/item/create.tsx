@@ -1,12 +1,18 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams, type Href } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
 import { CreateItemForm } from '../../components/items/create-item-form';
 
 export default function CreateItemScreen() {
   const router = useRouter();
+  const { collectionId, category, from } = useLocalSearchParams<{
+    collectionId?: string;
+    category?: string;
+    from?: string;
+  }>()
+  const backHref = (from ?? (collectionId ? `/collection/${collectionId}` : '/')) as Href;
 
   const softShadow = {
     shadowColor: '#64748B',
@@ -21,7 +27,7 @@ export default function CreateItemScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
-          onPress={() => router.back()}
+          onPress={() => router.replace(backHref)}
           activeOpacity={0.7}
           style={[styles.backBtn, softShadow]}
         >
@@ -36,7 +42,12 @@ export default function CreateItemScreen() {
 
       {/* Main Form Component */}
       <View style={styles.formContainer}>
-        <CreateItemForm onSuccess={() => router.replace('/')} />
+        <CreateItemForm
+          collectionId={collectionId}
+          returnTo={backHref as string}
+          initialCategory={category === 'note' || category === 'file' || category === 'link' ? category : undefined}
+          onSuccess={() => router.replace(backHref)}
+        />
       </View>
     </SafeAreaView>
   );
