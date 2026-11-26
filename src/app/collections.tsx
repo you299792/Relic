@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { withFrom } from '../utils/nav';
 import { useItems } from '../hooks/useItems';
+import { useTabBarScroll } from '../hooks/use-tab-bar-scroll';
 import { useCollections, COLLECTION_COLORS } from '../hooks/useCollections';
 import { FAB } from '../components/ui/fab';
 import { FolderPlus, ChevronRight, Search, X, FileText, Folder } from 'lucide-react-native';
@@ -12,6 +13,7 @@ import { FolderRow, FolderRowData } from '../components/collections/folder-row';
 
 export default function CollectionsScreen() {
   const router = useRouter();
+  const onTabBarScroll = useTabBarScroll();
   const { items } = useItems();
   const { collections, addCollection } = useCollections();
   const [createVisible, setCreateVisible] = useState(false);
@@ -115,6 +117,8 @@ export default function CollectionsScreen() {
 
       <ScrollView 
         className="flex-1" 
+        onScroll={onTabBarScroll}
+        scrollEventThrottle={16}
         keyboardShouldPersistTaps="handled"
 
         showsVerticalScrollIndicator={false}

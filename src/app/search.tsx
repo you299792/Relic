@@ -132,16 +132,12 @@ export default function SearchScreen() {
         </ScrollView>
       </View>
 
-      {/* --- CONTENT AREA (Conditional) --- */}
-      <ScrollView 
-        className="flex-1" 
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 }}
-      >
-        {!isSearching ? (
-          // ==========================================
-          // EMPTY STATE (Recent & Suggested)
-          // ==========================================
+      {/* --- CONTENT AREA: the feed owns the scrolling --- */}
+      <DiscoverFeed
+        query={query}
+        header={
+          !isSearching ? (
+            // Empty state: recent & suggested
           <View>
             {/* Recent Searches */}
             <View className="mb-10">
@@ -182,14 +178,10 @@ export default function SearchScreen() {
               </View>
             </View>
 
-            {/* Articles from the internet, based on saved items */}
-            <DiscoverFeed />
-          </View>
-        ) : (
-          // ==========================================
-          // ACTIVE STATE (Search Results)
-          // ==========================================
-          <View>
+            </View>
+          ) : (
+            // Active state: search results
+          <View className="mb-6">
             <Text className="text-slate-500 text-sm font-semibold mb-4">
               Found {MOCK_RESULTS.length} results for "{query}"
             </Text>
@@ -233,13 +225,10 @@ export default function SearchScreen() {
                 </View>
               </TouchableOpacity>
             ))}
-
-            <View className="mt-6">
-              <DiscoverFeed query={query} />
             </View>
-          </View>
-        )}
-      </ScrollView>
+          )
+        }
+      />
 
     </SafeAreaView>
   );
