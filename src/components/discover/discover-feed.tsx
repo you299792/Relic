@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, Image, TouchableOpacity, ActivityIndicator, Linking } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, Image, TouchableOpacity, ActivityIndicator, Linking, ScrollView } from 'react-native';
 import { Bookmark, BookmarkCheck, RefreshCw, WifiOff, Sparkles, Image as ImageIcon } from 'lucide-react-native';
 import { useItems, INITIAL_ITEMS } from '../../hooks/useItems';
 import { normalizeUrl } from '../../services/duplicate';
@@ -8,8 +8,15 @@ import { timeAgo } from '../../utils/date';
 import {
   buildInterests,
   fetchDiscoverFeed,
+  fetchCategoryFeed,
   DiscoverArticle,
+  DiscoverCategory,
+  DISCOVER_CATEGORIES,
   FALLBACK_TOPICS,
+  MIN_UNSEEN_FOR_LOCAL_REFRESH,
+  loadSeen,
+  markSeen,
+  pickBatch,
 } from '../../services/discover';
 
 const SAMPLE_IDS = new Set(INITIAL_ITEMS.map((i) => i.id));
@@ -54,7 +61,10 @@ interface DiscoverFeedProps {
 
 interface FeedResult {
   key: string;
+  /** Full pool fetched for this feed. */
   articles: DiscoverArticle[];
+  /** The slice of the pool currently shown. */
+  batch: DiscoverArticle[];
   failed: boolean;
 }
 
@@ -63,30 +73,49 @@ export function DiscoverFeed({ query }: DiscoverFeedProps) {
   const [interests, setInterests] = useState(() => buildInterests(items, SAMPLE_IDS));
   const [reloadToken, setReloadToken] = useState(0);
   const [result, setResult] = useState<FeedResult | null>(null);
-  const [activeTopic, setActiveTopic] = useState<string | null>(null);
+  const [category, setCategory] = useState<DiscoverCategory>('all');
+  const forceRef = useRef(false);
+  const seenRef = useRef<Set<string>>(new Set());
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
   const [previewImages, setPreviewImages] = useState<Record<string, string>>({});
   const [previewDone, setPreviewDone] = useState<Set<string>>(new Set());
 
   const trimmedQuery = query?.trim() ?? '';
-  const usingFallback = !trimmedQuery && interests.length === 0;
+  const personalized = !trimmedQuery && category === 'foryou';
+  const usingFallback = personalized && interests.length === 0;
   const topics = useMemo(
     () => (trimmedQuery ? [trimmedQuery] : interests.length > 0 ? interests : FALLBACK_TOPICS),
     [trimmedQuery, interests]
   );
-  const requestKey = `${topics.join('|')}#${reloadToken}`;
+  const scope = personalized ? 'foryou' : category;
+  const requestKey = trimmedQuery
+    ? `q:${trimmedQuery}#${reloadToken}`
+    : personalized
+      ? `foryou:${topics.join('|')}#${reloadToken}`
+      : `${category}#${reloadToken}`;
 
   useEffect(() => {
     let cancelled = false;
+    const force = forceRef.current;
+    forceRef.current = false;
+    const request =
+      trimmedQuery || personalized ? fetchDiscoverFeed(topics) : fetchCategoryFeed(category, force);
     // Debounce typing so we don't fire a request per keystroke
     const timer = setTimeout(
       () => {
-        fetchDiscoverFeed(topics)
-          .then((articles) => {
-            if (!cancelled) setResult({ key: requestKey, articles, failed: false });
+        request
+          .then(async (articles) => {
+            let batch = articles;
+            if (!trimmedQuery) {
+              const seen = await loadSeen(scope);
+              batch = pickBatch(articles, seen);
+              markSeen(scope, seen, batch.map((a) => a.id));
+              seenRef.current = seen;
+            }
+            if (!cancelled) setResult({ key: requestKey, articles, batch, failed: false });
           })
           .catch(() => {
-            if (!cancelled) setResult({ key: requestKey, articles: [], failed: true });
+            if (!cancelled) setResult({ key: requestKey, articles: [], batch: [], failed: true });
           });
       },
       trimmedQuery ? 500 : 0
@@ -95,10 +124,10 @@ export function DiscoverFeed({ query }: DiscoverFeedProps) {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [topics, requestKey, trimmedQuery]);
+  }, [topics, requestKey, trimmedQuery, personalized, category, scope]);
 
   const loading = !result || result.key !== requestKey;
-  const articles = useMemo(() => (!loading ? result.articles : []), [loading, result]);
+  const articles = useMemo(() => (!loading ? result.batch : []), [loading, result]);
   const failed = !loading && result.failed;
 
   // Fetch preview images for articles that came without one (e.g. Hacker News links)
@@ -129,11 +158,22 @@ export function DiscoverFeed({ query }: DiscoverFeedProps) {
     [items]
   );
 
-  const visible = activeTopic ? articles.filter((a) => a.topic === activeTopic) : articles;
+  const visible = articles;
 
   const refresh = () => {
-    if (!trimmedQuery) setInterests(buildInterests(items, SAMPLE_IDS));
-    setActiveTopic(null);
+    // Show the next unseen articles from the pool we already have; no network needed.
+    if (!trimmedQuery && !loading && !failed && result) {
+      const unseen = result.articles.filter((a) => !seenRef.current.has(a.id));
+      if (unseen.length >= MIN_UNSEEN_FOR_LOCAL_REFRESH) {
+        const batch = pickBatch(result.articles, seenRef.current);
+        markSeen(scope, seenRef.current, batch.map((a) => a.id));
+        setResult({ ...result, batch });
+        return;
+      }
+    }
+    // Pool exhausted (or search / failed): fetch fresh articles from the network.
+    if (personalized) setInterests(buildInterests(items, SAMPLE_IDS));
+    forceRef.current = true;
     setReloadToken((n) => n + 1);
   };
 
@@ -161,12 +201,15 @@ export function DiscoverFeed({ query }: DiscoverFeedProps) {
     }
   };
 
-  const heading = trimmedQuery ? 'From the web' : 'Discover for you';
+  const categoryLabel = DISCOVER_CATEGORIES.find((c) => c.key === category)?.label ?? 'Discover';
+  const heading = trimmedQuery ? 'From the web' : personalized ? 'Discover for you' : categoryLabel;
   const subheading = trimmedQuery
     ? `Articles matching "${trimmedQuery}"`
-    : usingFallback
-      ? 'Popular reads. Save a few items and this feed will match your interests.'
-      : 'Based on what you save';
+    : personalized
+      ? usingFallback
+        ? 'Popular reads. Save a few items and this feed will match your interests.'
+        : 'Based on what you save'
+      : 'Fresh from the web';
 
   return (
     <View>
@@ -187,23 +230,21 @@ export function DiscoverFeed({ query }: DiscoverFeedProps) {
       </View>
       <Text className="text-slate-500 text-xs mb-4">{subheading}</Text>
 
-      {!trimmedQuery && topics.length > 1 && (
-        <View className="flex-row flex-wrap gap-2 mb-4">
-          {[null, ...topics].map((topic) => {
-            const isActive = activeTopic === topic;
+      {!trimmedQuery && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4 -mx-5" contentContainerStyle={{ paddingHorizontal: 20, gap: 8 }}>
+          {DISCOVER_CATEGORIES.map((c) => {
+            const isActive = category === c.key;
             return (
               <TouchableOpacity
-                key={topic ?? 'all'}
-                onPress={() => setActiveTopic(topic)}
+                key={c.key}
+                onPress={() => setCategory(c.key)}
                 className={`px-3.5 py-2 rounded-full ${isActive ? 'bg-indigo-600' : 'bg-indigo-50'}`}
               >
-                <Text className={`text-xs font-semibold ${isActive ? 'text-white' : 'text-indigo-600'}`}>
-                  {topic ? `#${topic}` : 'All'}
-                </Text>
+                <Text className={`text-xs font-semibold ${isActive ? 'text-white' : 'text-indigo-600'}`}>{c.label}</Text>
               </TouchableOpacity>
             );
           })}
-        </View>
+        </ScrollView>
       )}
 
       {loading ? (
@@ -226,7 +267,7 @@ export function DiscoverFeed({ query }: DiscoverFeedProps) {
       ) : visible.length === 0 ? (
         <View className="bg-white rounded-3xl p-8 items-center" style={softShadow}>
           <Text className="text-slate-800 text-base font-bold mb-1">No articles found</Text>
-          <Text className="text-slate-500 text-xs text-center">Try a different topic or search term.</Text>
+          <Text className="text-slate-500 text-xs text-center">Try another category or search term.</Text>
         </View>
       ) : (
         visible.map((article) => {
