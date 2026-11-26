@@ -496,15 +496,18 @@ export function DiscoverFeed({ query, header }: DiscoverFeedProps) {
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 }}
       />
       {showTop && (
-        <TouchableOpacity
-          onPress={scrollToTop}
-          activeOpacity={0.85}
-          accessibilityLabel="Back to top"
-          className="absolute right-5 bottom-28 w-12 h-12 rounded-full bg-indigo-600 items-center justify-center"
-          style={softShadow}
-        >
-          <ArrowUp color="#FFFFFF" size={22} />
-        </TouchableOpacity>
+        <View pointerEvents="box-none" className="absolute left-0 right-0 bottom-28 items-center">
+          <TouchableOpacity
+            onPress={scrollToTop}
+            activeOpacity={0.85}
+            accessibilityLabel="Back to top"
+            className="flex-row items-center gap-1.5 bg-indigo-600 pl-3.5 pr-4 py-2.5 rounded-full"
+            style={softShadow}
+          >
+            <ArrowUp color="#FFFFFF" size={16} />
+            <Text className="text-white text-xs font-semibold">Back to top</Text>
+          </TouchableOpacity>
+        </View>
       )}
     </View>
   );
