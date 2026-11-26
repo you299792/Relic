@@ -620,3 +620,19 @@ export function pickBatch(pool: DiscoverArticle[], seen: Set<string>, size = BAT
   }
   return shuffle(batch);
 }
+
+/**
+ * Next batch for endless scrolling: pool articles not yet on screen, unseen-before-this-session
+ * ones first. Returns an empty list when the pool is exhausted.
+ */
+export function nextBatch(
+  pool: DiscoverArticle[],
+  shownIds: Set<string>,
+  seen: Set<string>,
+  size = BATCH_SIZE
+): DiscoverArticle[] {
+  const remaining = pool.filter((a) => !shownIds.has(a.id));
+  const fresh = remaining.filter((a) => !seen.has(a.id));
+  const stale = remaining.filter((a) => seen.has(a.id));
+  return [...fresh, ...stale].slice(0, size);
+}
