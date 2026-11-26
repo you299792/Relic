@@ -8,6 +8,7 @@ import {
   Image
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTabBarScroll } from '../hooks/use-tab-bar-scroll';
 import {
   Moon,
   Bell,
@@ -26,6 +27,7 @@ import {
 } from 'lucide-react-native';
 
 export default function MenuScreen() {
+  const onTabBarScroll = useTabBarScroll();
   const [isSyncEnabled, setIsSyncEnabled] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [notifications, setNotifications] = useState(true);
@@ -84,6 +86,8 @@ export default function MenuScreen() {
 
       <ScrollView 
         className="flex-1" 
+        onScroll={onTabBarScroll}
+        scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 }}
       >

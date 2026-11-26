@@ -24,6 +24,7 @@ import { useItems, INITIAL_ITEMS } from '../../hooks/useItems';
 import { normalizeUrl } from '../../services/duplicate';
 import { fetchPreviewImage } from '../../services/scraper';
 import { timeAgo } from '../../utils/date';
+import { useTabBarScroll } from '../../hooks/use-tab-bar-scroll';
 import {
   buildInterests,
   fetchDiscoverFeed,
@@ -213,6 +214,7 @@ export function DiscoverFeed({ query, header }: DiscoverFeedProps) {
   const loadingMoreRef = useRef(false);
   const keyRef = useRef('');
   const listRef = useRef<FlatList<DiscoverArticle>>(null);
+  const onTabBarScroll = useTabBarScroll();
 
   const trimmedQuery = query?.trim() ?? '';
   const personalized = !trimmedQuery && category === 'foryou';
@@ -288,9 +290,13 @@ export function DiscoverFeed({ query, header }: DiscoverFeedProps) {
 
   const scrollToTop = useCallback(() => listRef.current?.scrollToOffset({ offset: 0, animated: true }), []);
 
-  const onScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    setShowTop(e.nativeEvent.contentOffset.y > SHOW_TOP_AFTER_PX);
-  }, []);
+  const onScroll = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      setShowTop(e.nativeEvent.contentOffset.y > SHOW_TOP_AFTER_PX);
+      onTabBarScroll(e);
+    },
+    [onTabBarScroll]
+  );
 
   /** Appends the next batch when the user nears the bottom; refetches when the pool runs out. */
   const loadMore = useCallback(async () => {
@@ -486,7 +492,7 @@ export function DiscoverFeed({ query, header }: DiscoverFeedProps) {
         onEndReached={loadMore}
         onEndReachedThreshold={0.6}
         onScroll={onScroll}
-        scrollEventThrottle={100}
+        scrollEventThrottle={16}
         initialNumToRender={4}
         maxToRenderPerBatch={4}
         windowSize={7}

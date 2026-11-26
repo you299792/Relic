@@ -7,6 +7,7 @@ import {
 import { usePathname } from 'expo-router';
 import { Folder, House, Menu, Search, LucideIcon } from 'lucide-react-native';
 import { useEffect } from 'react';
+import { setTabBarHidden, tabBarHidden } from '../hooks/use-tab-bar-scroll';
 import { StyleSheet, View, Text } from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -14,6 +15,9 @@ import Animated, {
   withTiming,
   Easing,
 } from 'react-native-reanimated';
+
+/** Bar height + bottom offset + shadow, so it fully clears the screen edge. */
+const TAB_BAR_HIDE_DISTANCE = 130;
 
 function TabButton({ isActive, icon: Icon, label }: { isActive: boolean, icon: LucideIcon, label: string }) {
   const progress = useSharedValue(isActive ? 1 : 0);
@@ -64,16 +68,35 @@ export default function AppTabs() {
   const isActive = (path: string) => pathname === path;
   const isTabBarHidden = pathname.startsWith('/item') || pathname.startsWith('/(auth)');
 
+  // Slide the bar off-screen while a screen is scrolled down; always show it on navigation
+  useEffect(() => {
+    setTabBarHidden(false);
+  }, [pathname]);
+
+  // expo-router's <TabList asChild> rejects style arrays, so the static bar styles are
+  // merged into the animated style, which makes a single object.
   const tabBarStyle = StyleSheet.flatten([
     styles.tabBar,
     isTabBarHidden ? { display: 'none' } : undefined,
   ]);
 
+  const animatedTabBarStyle = useAnimatedStyle(() => ({
+    ...tabBarStyle,
+    transform: [
+      {
+        translateY: withTiming(tabBarHidden.value * TAB_BAR_HIDE_DISTANCE, {
+          duration: 220,
+          easing: Easing.out(Easing.quad),
+        }),
+      },
+    ],
+  }));
+
   return (
     <Tabs>
       <TabSlot style={styles.content} />
       <TabList asChild>
-        <View style={tabBarStyle}>
+        <Animated.View style={animatedTabBarStyle}>
           <TabTrigger name="home" href="/" style={styles.tabTrigger}>
             <TabButton isActive={isActive('/')} icon={House} label="Home" />
           </TabTrigger>
@@ -92,7 +115,7 @@ export default function AppTabs() {
 
           <TabTrigger name="item" href="/item/create" style={styles.hiddenTrigger} />
           <TabTrigger name="collection" href="/collection/[id]" style={styles.hiddenTrigger} />
-        </View>
+        </Animated.View>
       </TabList>
     </Tabs>
   );

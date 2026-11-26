@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, usePathname } from 'expo-router';
 import { withFrom } from '../../utils/nav';
+import { useTabBarScroll } from '../../hooks/use-tab-bar-scroll';
 import {
   Search,
   Link as LinkIcon,
@@ -148,6 +149,7 @@ export function ItemFeed({
 }: ItemFeedProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const onTabBarScroll = useTabBarScroll();
   const deleteItem = onDeleteItem;
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [activeFilter, setActiveFilter] = useState('All');
@@ -313,6 +315,8 @@ export function ItemFeed({
       {/* --- MAIN SCROLLVIEW WRAPS EVERYTHING --- */}
       <ScrollView 
         className="flex-1" 
+        onScroll={onTabBarScroll}
+        scrollEventThrottle={16}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 120 }}
